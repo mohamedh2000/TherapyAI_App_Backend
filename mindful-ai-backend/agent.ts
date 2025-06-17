@@ -14,9 +14,15 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import crypto from 'crypto';
+
+if (typeof globalThis.crypto === 'undefined') {
+  // @ts-ignore
+  globalThis.crypto = crypto;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.join(__dirname, '../.env.local');
+const envPath = path.join(__dirname, '../.env');
 const openApiKey = process.env.OPENAI_API_KEY;
 dotenv.config({ path: envPath });
 

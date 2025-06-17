@@ -1,17 +1,23 @@
 import { AccessToken, AccessTokenOptions, VideoGrant } from "livekit-server-sdk";
-const dotenv = require('dotenv');
+import dotenv from 'dotenv';
+import express from 'express';
+import cors from 'cors';
+import { Pool } from "pg";
 dotenv.config();
 
 // NOTE: you are expected to define the following environment variables in `.env.local`:
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
 const LIVEKIT_URL = process.env.LIVEKIT_URL;
-const express = require('express')
-const cors = require('cors')
-const app = express()
-const port = 3000
+const app = express();
+const port = 3000;
 
 app.use(cors());
+app.use(express.json());
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL, // or use user, password, host, port, database
+});
 
 export type ConnectionDetails = {
   serverUrl: string;
@@ -68,20 +74,23 @@ app.get('/api/connection-details', async (req, res) => {
       'Access-Control-Allow-Origin': '*',
     });
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json(data);
+    res.status(200).json(data);
   } catch (error) {
     if (error instanceof Error) {
       console.error(error);
-      return res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error.message });
     }
   }
 });
 
+app.post('/api/user', async (req, res) => {
+  let userId = req?.body?.userId; 
+  const sessionData = await pool.query('SELECT * FROM USER_SESSIONS WHERE user_id = $1', [userId]);
+  const userData = await pool.query('SELECT * FROM USERS WHERE id = $1', [userId]);
 
-app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
+  res.status(200).json({ sessionData: sessionData.rows, userData: userData.rows });
+});
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+  console.log(`Example app listening on port ${port}`);
+});
