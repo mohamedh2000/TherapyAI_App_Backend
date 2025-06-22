@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "build": "npx tsc",
-    "start": "npm run build; node dist/index.js & node dist/agent.js dev; ",
+    "start": "npm run build; docker-compose up -d; node dist/index.js & node dist/agent.js dev; ",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -16,6 +16,7 @@
     "@livekit/agents-plugin-openai": "^0.9.1",
     "dotenv": "^16.5.0",
     "livekit-server-sdk": "^2.13.0",
+    "openai": "^5.5.1",
     "pg": "^8.16.0"
   },
   "type": "module",
