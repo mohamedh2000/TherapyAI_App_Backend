@@ -27,6 +27,7 @@ export type ConnectionDetails = {
   roomName: string;
   participantName: string;
   participantToken: string;
+  embeddings: any[];
 };
 
 function createParticipantToken(userInfo: AccessTokenOptions, roomName: string) {
@@ -45,8 +46,14 @@ function createParticipantToken(userInfo: AccessTokenOptions, roomName: string) 
   return at.toJwt();
 }
 
-app.get('/api/connection-details', async (req, res) => {
+app.post('/api/connection-details', async (req, res) => {
   try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      res.status(400).json({ error: 'userId is required' });
+    }
+
     if (LIVEKIT_URL === undefined) {
       throw new Error("LIVEKIT_URL is not defined");
     }
@@ -57,9 +64,16 @@ app.get('/api/connection-details', async (req, res) => {
       throw new Error("LIVEKIT_API_SECRET is not defined");
     }
 
+    // Fetch embeddings
+    const embeddingsResult = await pool.query(
+      'SELECT embedding FROM user_sessions WHERE user_id = $1',
+      [userId]
+    );
+    const embeddings = embeddingsResult.rows.map(row => row.embedding);
+
     // Generate participant token
     const participantIdentity = `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
-    const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
+    const roomName = `voice_assistant_room_${userId}_${Math.floor(Math.random() * 10_000)}`;
     const participantToken = await createParticipantToken(
       { identity: participantIdentity },
       roomName
@@ -71,12 +85,10 @@ app.get('/api/connection-details', async (req, res) => {
       roomName,
       participantToken: participantToken,
       participantName: participantIdentity,
+      embeddings: embeddings,
     };
-    const headers = new Headers({
-      "Cache-Control": "no-store",
-      'Access-Control-Allow-Origin': '*',
-    });
     res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.status(200).json(data);
   } catch (error) {
     if (error instanceof Error) {
@@ -108,10 +120,20 @@ app.post('/api/save-transcript', async (req, res) => {
     throw new Error("No response content received from OpenAI");
   }
   
-  const sessionAnalysisJson = JSON.parse(content);
+  let sessionAnalysisJson;
+  try {
+    sessionAnalysisJson = JSON.parse(content);
+  } catch (error) {
+    console.error('Failed to parse OpenAI response as JSON:', content);
+    // Fallback to default values
+    sessionAnalysisJson = {
+      sentiment: 'neutral',
+      main_subjects: ['general discussion']
+    };
+  }
 
-  const sentiment = sessionAnalysisJson.sentiment;
-  const subjects = sessionAnalysisJson.main_subjects;
+  const sentiment = (sessionAnalysisJson.sentiment || 'neutral').toLowerCase();
+  const subjects = sessionAnalysisJson.main_subjects || ['general discussion'];
 
   const embedding = await client.embeddings.create({
     model: "text-embedding-3-small",
