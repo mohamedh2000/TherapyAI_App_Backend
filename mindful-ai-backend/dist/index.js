@@ -33,6 +33,20 @@ function createParticipantToken(userInfo, roomName) {
     at.addGrant(grant);
     return at.toJwt();
 }
+app.post('/api/update-profile', async (req, res) => {
+    const { userId, displayName, email } = req.body;
+    console.log('Received profile update:', userId, displayName, email);
+    // Update profile in database
+    try {
+        await pool.query('UPDATE users SET full_name = $1, email = $2 WHERE id = $3', [displayName, email, userId]);
+        console.log('Profile updated successfully');
+    }
+    catch (error) {
+        console.error('Error updating profile:', error);
+        res.status(500).json({ success: false, message: 'Failed to update profile' });
+    }
+    res.status(200).json({ success: true });
+});
 app.post('/api/connection-details', async (req, res) => {
     try {
         const { userId } = req.body;
@@ -134,9 +148,11 @@ app.post('/api/save-transcript', async (req, res) => {
 });
 app.post('/api/user', async (req, res) => {
     let userId = req?.body?.userId;
+    console.log("user id: ", userId);
     // Check if user exists, if not create them
     try {
         const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+        console.log(userCheck);
         if (userCheck.rows.length === 0) {
             // User doesn't exist, create them
             await pool.query('INSERT INTO users (id, full_name, email) VALUES ($1, $2, $3)', [userId, 'User', `${userId}@example.com`]);
@@ -146,8 +162,9 @@ app.post('/api/user', async (req, res) => {
     catch (error) {
         console.error('Error checking/creating user:', error);
     }
-    const sessionData = await pool.query('SELECT * FROM USER_SESSIONS WHERE user_id = $1', [userId]);
-    const userData = await pool.query('SELECT * FROM USERS WHERE id = $1', [userId]);
+    console.log("im in api user");
+    const sessionData = await pool.query('SELECT * FROM user_sessions WHERE user_id = $1', [userId]);
+    const userData = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
     res.status(200).json({ sessionData: sessionData.rows, userData: userData.rows });
 });
 app.listen(port, () => {
